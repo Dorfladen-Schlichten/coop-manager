@@ -372,7 +372,7 @@ danach.
   `/healthz` und einem uvicorn-Prozess.
 - **`compose.yaml`**: `./data` als `/data`, Port `127.0.0.1:8001`, Einstellungen aus `.env`.
 - **`deploy.sh`**: überträgt eine feste Dateiliste per `tar` über `ssh` aufs NAS, dort
-  `docker compose up -d --build`.
+  `docker compose build`, Stopp über den Container Manager (`synowebapi`), `docker compose up -d`.
 - **Sicherung:** täglich `coop-manager backup` per DSM-Aufgabenplaner, danach Hyper Backup.
 
 Einrichtung, Updates, Wiederherstellen und Fehlerbilder: `DEPLOYMENT.md`.

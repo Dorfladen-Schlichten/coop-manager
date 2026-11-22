@@ -20,4 +20,12 @@ tar -c --exclude __pycache__ \
     frontend/tsconfig.json frontend/tsconfig.app.json frontend/tsconfig.node.json frontend/vite.config.ts \
     frontend/public frontend/src |
     ssh "$HOST" "cd '$DIR' && rm -rf backend frontend && tar -x --no-same-owner"
-ssh "$HOST" "cd '$DIR' && $DOCKER compose up -d --build && $DOCKER compose ps"
+# Erst bauen, dann stoppen: So läuft die alte Version, solange das Image gebaut wird.
+# Gestoppt wird über den Container Manager (synowebapi), nicht über docker. Einen Stopp über docker
+# hält die Synology für einen Absturz und meldet „Container wurde unerwartet beendet“.
+# Schlägt der Stopp fehl (etwa beim ersten Deploy ohne Container), ersetzt compose den Container wie bisher.
+CONTAINER=${CM_DEPLOY_CONTAINER:-coop-manager-app-1}
+ssh "$HOST" "cd '$DIR' && $DOCKER compose build && \
+    { sudo /usr/syno/bin/synowebapi --exec api=SYNO.Docker.Container method=stop version=1 \
+        name='\"$CONTAINER\"' >/dev/null 2>&1 || true; } && \
+    $DOCKER compose up -d && $DOCKER compose ps"

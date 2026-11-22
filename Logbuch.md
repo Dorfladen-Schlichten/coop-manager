@@ -3642,3 +3642,23 @@ Grund, 32×32). `index.html` bleibt unverändert, der Verweis `/favicon.ico` pas
 **Warum so:** Dateien unter `frontend/public` kopiert Vite beim Build unverändert nach `dist/` und
 liefert sie unter ihrem Namen aus. So reicht es, die Datei auszutauschen. Beide Anwendungen des
 Dorfladens sehen im Browser-Tab gleich aus.
+
+## 2026-11-22 – Deploy ohne Meldung „Container wurde unerwartet beendet“
+
+**Was:** Nach jedem Deploy meldete DSM per Desktop und E-Mail „Container coop-manager-app-1 wurde
+unerwartet beendet“, obwohl die App lief. `deploy.sh` ruft jetzt nacheinander `docker compose build`,
+den Stopp über den Container Manager (`synowebapi --exec api=SYNO.Docker.Container method=stop`)
+und `docker compose up -d` auf. Geprüft auf der DS218: Deploy ohne Änderung und Neuanlage des
+Containers (`--force-recreate`) liefen ohne neue Meldung in `/var/log/synotifyd.log`, der Container
+ist danach `healthy`. DEPLOYMENT.md (Ablauf, Fehlerbild) und TECHNIK.md angepasst.
+
+**Warum so:** Der Dienst `docker_event_watcherd` des Container Managers wertet jedes `stop`/`kill`
+als unerwartet, das er nicht selbst ausgelöst hat. `compose up --build` stoppt den alten Container
+mit `docker`, also gab es die Meldung bei jedem Deploy. Ein vorgeschaltetes `docker compose stop`
+hätte nichts geändert, es ist derselbe Docker-Befehl. Läuft der Stopp über die DSM-Schnittstelle
+`synowebapi`, weiß der Container Manager Bescheid. `compose up -d` findet den Container dann schon
+gestoppt und ersetzt oder startet ihn nur noch.
+Erst bauen, dann stoppen: Der Bau dauert auf dem NAS am längsten, die alte Version bleibt so lange
+erreichbar. `synowebapi` meldet `"success": false` („No such container“ mit einer alten ID aus
+`/var/packages/ContainerManager/etc/coop-manager-app-1.config`), stoppt aber trotzdem. Deshalb
+`|| true`; klappt der Stopp einmal wirklich nicht, ersetzt `compose up` den Container wie früher.

@@ -166,8 +166,17 @@ tar -C <ordner mit der Sicherung> -c eventstore.sqlite \
 
 `deploy.sh` überträgt `Dockerfile`, `compose.yaml`, `.dockerignore`, aus `backend/` die Dateien
 `pyproject.toml`, `uv.lock` und `src/` und aus `frontend/` die Quellen (ohne `node_modules` und
-`dist`) per `tar` in den Projektordner. Dort baut es das Image und startet mit
-`docker compose up -d --build`. `.env` und `data/` bleiben unberührt.
+`dist`) per `tar` in den Projektordner. Dort baut es mit `docker compose build` das Image, während
+die alte Version noch läuft. Dann stoppt es den Container über den Container Manager
+(`synowebapi … SYNO.Docker.Container method=stop`) und startet mit `docker compose up -d`.
+`.env` und `data/` bleiben unberührt.
+
+Warum der Umweg über `synowebapi`: Stoppt man den Container direkt mit `docker` (auch
+indirekt über `compose up`), meldet der Container Manager „Container wurde unerwartet beendet“
+per Desktop und E-Mail. Einen Stopp über seine eigene Schnittstelle erkennt er als gewollt.
+`synowebapi` antwortet dabei mit `"success": false` und „No such container: …“, weil der
+Container Manager in `/var/packages/ContainerManager/etc/coop-manager-app-1.config` noch eine
+alte Container-ID kennt. Gestoppt wird trotzdem, `deploy.sh` übergeht die Meldung.
 
 Gebaut wird **auf dem NAS**: Es ist ARM64, der eigene Rechner meist x86. Beim ersten Mal dauert
 das einige Minuten, weil auch `npm ci` und der Vite-Build dort laufen.
@@ -397,5 +406,6 @@ anpassen.
 | Anmeldung klappt, aber die nächste Anfrage meldet „nicht angemeldet“ | Seite über `http://` aufgerufen, der Browser schickt das `Secure`-Cookie nicht mit | Über `https://` aufrufen. Nur ohne HTTPS (LAN-Test) `CM_SESSION_COOKIE_SECURE=false` |
 | `.env` zeigt in `ls -l` kein `+`, `synoacltool -get` meldet „It's Linux mode“ | Datei mit `sed -i` oder einem Editor ersetzt, die ACL ist dabei verloren gegangen; die Datei ist für alle lesbar | `sudo /usr/syno/bin/synoacltool -enforce-inherit $D/.env` |
 | Kein HSTS-Header, im Log steht die Gateway-Adresse | `CM_TRUSTED_PROXIES` passt nicht zum Gateway | Schritt 8 wiederholen |
+| DSM meldet „Container coop-manager-app-1 wurde unerwartet beendet“ direkt nach einem Deploy | Container wurde über `docker` statt über den Container Manager gestoppt (alte `deploy.sh` oder Handbefehl) | Harmlos. `deploy.sh` stoppt über `synowebapi`; von Hand: `sudo /usr/syno/bin/synowebapi --exec api=SYNO.Docker.Container method=stop version=1 name='"coop-manager-app-1"'` |
 | `sudo: docker: command not found` | `sudo` sucht nicht in `/usr/local/bin` | Vollen Pfad `/usr/local/bin/docker` nehmen |
 | `Bind for 127.0.0.1:8001 failed: port is already allocated` | Ein anderer Container belegt den Port | Freien Port in `CM_PORT` und im Reverse Proxy eintragen |
